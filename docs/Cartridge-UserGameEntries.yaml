@@ -1,0 +1,461 @@
+openapi: 3.0.0
+info:
+  description: API documentation for the User Game Entries (Collection) endpoints of the Cartridge Web and Mobile Application.
+  version: 1.0.0
+  title: Cartridge - User Game Entries
+  contact:
+    email: Julianbir123@gmail.com
+
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+
+tags:
+  - name: User Game Entries
+    description: Game collection entries owned by users
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/user-game-entries:
+    post:
+      tags:
+        - User Game Entries
+      summary: Add a game to the user's collection
+      operationId: createUserGameEntry
+      description: >
+        gameId must already refer to a cached Game (see the Games API —
+        POST /api/games/rawg/{rawgId} or /api/games/manual to cache one
+        first). listIds is optional; each id must be one of the caller's
+        own lists. Fails with 409 if this game is already in the caller's
+        collection.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGameUserEntry'
+      responses:
+        '201':
+          description: Game entry created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Game entry created successfully"
+                  entry:
+                    $ref: '#/components/schemas/GameUserEntry'
+        '400':
+          description: Invalid user/game/list ID, listIds not an array, or a schema validation failure (e.g. rating outside 0-5)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: The game, or one or more of the listIds, was not found (or not owned by the caller)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: This game is already in the caller's collection
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  entryId:
+                    type: string
+                    description: The id of the existing entry.
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/user-game-entries/collection:
+    get:
+      tags:
+        - User Game Entries
+      summary: Get all game entries for the logged-in user
+      operationId: getUserCollection
+      description: >
+        Returns the user's full collection, with each entry's referenced
+        game populated in under gameId. Clients sort, filter, and paginate
+        this list themselves, so no query params are needed.
+      responses:
+        '200':
+          description: Retrieved all game entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GameUserEntry'
+        '400':
+          description: Invalid user ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/user-game-entries/collection/{entryId}:
+    parameters:
+      - name: entryId
+        in: path
+        required: true
+        schema:
+          type: string
+
+    get:
+      tags:
+        - User Game Entries
+      summary: Get a single game entry
+      operationId: getUserGameEntry
+      responses:
+        '200':
+          description: Retrieved game entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameUserEntry'
+        '400':
+          description: Invalid user or entry ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Game entry not found (or not owned by the caller)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      tags:
+        - User Game Entries
+      summary: Update a game entry's own fields
+      operationId: updateUserGameEntry
+      description: >
+        Only played, hoursPlayed, rating, review, and platformPlayed can be
+        changed here — list membership is NOT managed on this endpoint (see
+        POST/DELETE /api/user-game-entries/lists/{listId}/games/{gameId}
+        instead). Unlike the other read endpoints, this one returns the
+        entry's full raw document (includes userId and does not filter
+        fields), and its populated gameId omits platforms.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GameUserEntryInput'
+      responses:
+        '200':
+          description: Updated game entry
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Game entry updated successfully"
+                  entry:
+                    $ref: '#/components/schemas/GameUserEntry'
+        '400':
+          description: Invalid user/entry ID, or no valid fields were provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Game entry not found (or not owned by the caller)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/user-game-entries/{entryId}:
+    parameters:
+      - name: entryId
+        in: path
+        required: true
+        schema:
+          type: string
+
+    delete:
+      tags:
+        - User Game Entries
+      summary: Delete a game entry
+      operationId: deleteUserGameEntry
+      description: Removes the game from the user's collection entirely (out of every list it belonged to). Note this is at /api/user-game-entries/{entryId}, not under /collection.
+      responses:
+        '200':
+          description: Deleted game entry
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Game removed from collection successfully"
+                  entryId:
+                    type: string
+        '400':
+          description: Invalid user or entry ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Game entry not found (or not owned by the caller)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/user-game-entries/lists/{listId}/games/{gameId}:
+    parameters:
+      - name: listId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: gameId
+        in: path
+        required: true
+        schema:
+          type: string
+
+    post:
+      tags:
+        - User Game Entries
+      summary: Add a saved game to one of the user's lists
+      operationId: addGameToUserList
+      description: >
+        Upserts: if the caller has no collection entry for this game yet,
+        one is created (unplayed, no rating) and immediately added to the
+        list. If an entry already exists, the list is just added to its
+        listIds (no duplicate if already present).
+      responses:
+        '200':
+          description: Game added to list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Game added to list successfully"
+                  entry:
+                    $ref: '#/components/schemas/GameUserEntry'
+        '400':
+          description: Invalid user, list, or game ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: List not found for this user, or game not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - User Game Entries
+      summary: Remove a saved game from one of the user's lists
+      operationId: removeGameFromUserList
+      description: Only removes this list from the entry's listIds — the entry stays in the user's overall collection.
+      responses:
+        '200':
+          description: Game removed from list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Game removed from list successfully"
+                  entry:
+                    $ref: '#/components/schemas/GameUserEntry'
+        '400':
+          description: Invalid user, list, or game ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: List not found for this user, or the game wasn't in that list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    GameUserEntry:
+      type: object
+      description: >
+        A collection entry, with the referenced game populated in under
+        gameId (a nested object, not a flat id) rather than flattened to
+        the top level.
+      properties:
+        _id:
+          type: string
+          example: "64f1a2b3c4d5e6f7a8b9c0d3"
+        gameId:
+          type: object
+          description: The populated Game document (only the summary fields below are selected).
+          properties:
+            _id:
+              type: string
+              example: "64f1a2b3c4d5e6f7a8b9c0e1"
+            name:
+              type: string
+              example: "Skyrim"
+            coverImage:
+              type: string
+              format: uri
+              nullable: true
+            genres:
+              type: array
+              items:
+                type: string
+            platforms:
+              type: array
+              items:
+                type: string
+              description: Omitted from the object returned by POST /api/user-game-entries specifically — present everywhere else.
+            releaseDate:
+              type: string
+              format: date
+              nullable: true
+            developers:
+              type: array
+              items:
+                type: string
+        played:
+          type: boolean
+          default: false
+        hoursPlayed:
+          type: number
+          default: 0
+          minimum: 0
+        rating:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 5
+        review:
+          type: string
+        platformPlayed:
+          type: string
+        listIds:
+          type: array
+          description: Ids of every list this entry currently belongs to. Not editable via PATCH on this entry — see the /lists/{listId}/games/{gameId} endpoints.
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    GameUserEntryInput:
+      type: object
+      description: Editable fields for an existing entry via PATCH. Also embedded inside CreateGameUserEntry. listIds is intentionally not editable here.
+      properties:
+        played:
+          type: boolean
+        hoursPlayed:
+          type: number
+          minimum: 0
+        rating:
+          type: number
+          minimum: 0
+          maximum: 5
+          nullable: true
+        review:
+          type: string
+        platformPlayed:
+          type: string
+
+    CreateGameUserEntry:
+      allOf:
+        - $ref: '#/components/schemas/GameUserEntryInput'
+        - type: object
+          required:
+            - gameId
+          properties:
+            gameId:
+              type: string
+              description: Must reference an already-cached Game (see the Games API).
+            listIds:
+              type: array
+              description: Lists (owned by the caller) to add this entry to at creation time. Optional.
+              items:
+                type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+
+servers:
+  - url: https://cartridgeapp.fun
